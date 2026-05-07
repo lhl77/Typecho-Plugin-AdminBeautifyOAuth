@@ -24,20 +24,8 @@
 </p>
 
 ---
-## 截图
-![](https://i.see.you/2026/05/07/zy5S/a50802dffe2f858862ca771f2badc364.jpg)
-
-## 功能特色
-
-| 功能 | 说明 |
-| ---- | ---- |
-| 登录页 OAuth 登录 | 在 AdminBeautify 登录页插入第三方登录按钮 |
-| 个人中心账号绑定 | 在个人设置页绑定 / 解绑第三方账号 |
-| 两种登录按钮样式 | 支持精简图标模式与完整按钮模式 |
-| SDK 自动扫描 | 自动识别 sdk 目录中的 `*SDK.class.php` 平台 |
-| 颜色集中管理 | 通过 `sdk/color.php` 管理按钮、图标背景与文字色 |
-| 配置可视化编辑 | 后台直接编辑平台、启用状态、Client ID、Client Secret |
-| 导入导出配置 | 支持导出到剪贴板、导出 JSON、从剪贴板 / 文件导入 |
+## 功能
+AdminBeautify 专用 OAuth 登录插件，支持 QQ / 微信 / GitHub / Google / MSN / 新浪 / 豆瓣 / 百度 / OIDC 第三方登录。
 
 ## 安装
 
@@ -102,6 +90,9 @@ sdk/color.php
 - 对应平台是否已启用
 - `Client ID / Client Secret` 是否已正确填写
 - 回调地址是否已配置到平台后台
+
+## 截图
+![](https://i.see.you/2026/05/07/zy5S/a50802dffe2f858862ca771f2badc364.jpg)
 
 
 ## 相关项目
