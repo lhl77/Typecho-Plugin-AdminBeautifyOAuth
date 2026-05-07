@@ -5,7 +5,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 /**
  * AdminBeautify 专用 OAuth 登录插件
  *
- * @package AdminBeautifyOAuth
+ * @package AB-OAuth
  * @author  LHL
  * @version 1.0.0
  * @link    https://github.com/lhl77/Typecho-Plugin-AdminBeautify
