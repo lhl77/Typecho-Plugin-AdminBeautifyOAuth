@@ -1,4 +1,4 @@
-<h1 align="center">AdminBeautifyOAuth</h1>
+<h1 align="center">AB OAuth</h1>
 
 <p align="center">
   <strong>Typecho 的 AdminBeautify 专用 OAuth 第三方登录插件</strong>
