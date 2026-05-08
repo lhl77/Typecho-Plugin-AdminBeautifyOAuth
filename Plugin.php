@@ -7,7 +7,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package AB-OAuth
  * @author  LHL
- * @version 1.0.0
+ * @version 1.0.1
  * @link    https://github.com/lhl77/Typecho-Plugin-AdminBeautify
  */
 class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
@@ -18,6 +18,7 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
     {
         Helper::addRoute('ab_oauth', '/ab-oauth', 'AdminBeautifyOAuth_Widget', 'oauth');
         Helper::addRoute('ab_oauth_callback', '/ab-oauth-callback', 'AdminBeautifyOAuth_Widget', 'callback');
+        Helper::addRoute('ab_oauth_callback_type', '/ab-oauth-callback/[type:string]', 'AdminBeautifyOAuth_Widget', 'callback');
         Helper::addRoute('ab_oauth_toggle', '/ab-oauth-toggle', 'AdminBeautifyOAuth_Widget', 'toggle');
         Helper::addRoute('ab_oauth_missing', '/ab-oauth-missing', 'AdminBeautifyOAuth_Widget', 'missing');
 
@@ -32,6 +33,7 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
     {
         Helper::removeRoute('ab_oauth');
         Helper::removeRoute('ab_oauth_callback');
+        Helper::removeRoute('ab_oauth_callback_type');
         Helper::removeRoute('ab_oauth_toggle');
         Helper::removeRoute('ab_oauth_missing');
         return _t('AdminBeautifyOAuth 已禁用');
@@ -40,6 +42,7 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
     public static function config(Typecho_Widget_Helper_Form $form)
     {
         self::ensureDefaultConfig();
+        $routeHealthy = self::hasCallbackTypeRoute();
 
         $providersJson = self::defaultProvidersJson();
         try {
@@ -112,7 +115,16 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
             . '<p>使用文档：<a href="https://blog.lhl.one/artical/1199.html" target="_blank" rel="noopener">https://blog.lhl.one/artical/1199.html</a></p>'
             . '</div>'
             . '</div>';
-        $callbackBase = htmlspecialchars(Typecho_Common::url('/ab-oauth-callback?type=', Typecho_Widget::widget('Widget_Options')->index), ENT_QUOTES);
+
+        if (!$routeHealthy) {
+            $tips = '<div class="ab-oauth-route-alert">'
+                . '<strong>检测到路由未更新</strong>'
+                . '<p>当前站点缺少新版回调路由 <code>/ab-oauth-callback/[type]</code>，请执行一次“禁用 -> 启用”以完成路由注册。</p>'
+                . '<p><b>重要：</b>禁用再启用前，请先点击“导出到剪贴板”或“导出 .json”备份配置，避免配置丢失。</p>'
+                . '</div>'
+                . $tips;
+        }
+        $callbackBase = htmlspecialchars(Typecho_Common::url('/ab-oauth-callback/', Typecho_Widget::widget('Widget_Options')->index), ENT_QUOTES);
 
         echo '<style>
 #ab-oauth-config-editor,
@@ -135,6 +147,10 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 .ab-oauth-guide b{color:var(--ab-md-on)}
 .ab-oauth-help{font-size:12px;color:var(--ab-md-on-subtle);margin-top:12px}
 .ab-oauth-help a{color:var(--ab-md-primary);text-decoration:none;font-weight:600}
+.ab-oauth-route-alert{margin-bottom:14px;padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--ab-md-primary) 35%, #ef4444 65%);background:color-mix(in srgb,#ef4444 8%,var(--ab-md-surface));color:var(--ab-md-on)}
+.ab-oauth-route-alert strong{display:block;font-size:13px;margin-bottom:4px;color:#b42318}
+.ab-oauth-route-alert p{margin:4px 0;font-size:12px;line-height:1.6}
+.ab-oauth-route-alert code{padding:1px 6px;border-radius:999px;background:color-mix(in srgb,var(--ab-md-primary) 12%,transparent);color:var(--ab-md-primary)}
 .ab-oauth-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:4px}
 #ab-oauth-add-row,.ab-oauth-btn{border:none;background:var(--ab-md-primary);color:var(--md-on-primary,#fff);border-radius:999px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 4px 10px color-mix(in srgb,var(--md-primary,#6750a4) 30%, transparent)}
 .ab-oauth-btn-tonal{border:none;background:color-mix(in srgb,var(--ab-md-primary) 12%,var(--ab-md-surface));color:var(--ab-md-primary);border-radius:999px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer}
@@ -696,6 +712,31 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 
         $colors = require $file;
         return is_array($colors) ? $colors : array();
+    }
+
+    private static function hasCallbackTypeRoute()
+    {
+        try {
+            $routingTable = Typecho_Widget::widget('Widget_Options')->routingTable;
+            if (!is_array($routingTable)) {
+                return false;
+            }
+
+            if (isset($routingTable['ab_oauth_callback_type'])
+                && isset($routingTable['ab_oauth_callback_type']['url'])
+                && $routingTable['ab_oauth_callback_type']['url'] === '/ab-oauth-callback/[type:string]') {
+                return true;
+            }
+
+            foreach ($routingTable as $route) {
+                if (is_array($route) && isset($route['url']) && $route['url'] === '/ab-oauth-callback/[type:string]') {
+                    return true;
+                }
+            }
+        } catch (Exception $e) {
+        }
+
+        return false;
     }
 
     public static function isAdminBeautifyReady()
