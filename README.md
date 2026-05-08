@@ -25,7 +25,7 @@
 
 ---
 ## 功能
-AdminBeautify 专用 OAuth 登录插件，支持 QQ / 微信 / GitHub / Google / 新浪 / 豆瓣 / 百度 / OIDC 第三方登录。
+AdminBeautify 专用 OAuth 登录插件，支持 QQ / 微信 / GitHub / Google / MSN / 新浪 / 豆瓣 / 百度 / OIDC 第三方登录。
 
 ## 安装
 
