@@ -7,7 +7,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package AB-OAuth
  * @author  LHL
- * @version 1.0.0
+ * @version 1.0.1
  * @link    https://github.com/lhl77/Typecho-Plugin-AdminBeautify
  */
 class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
