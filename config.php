@@ -3,7 +3,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
 }
 
-define('ABOAUTH_CALLBACK_URL', Typecho_Common::url('/ab-oauth-callback?type=', Typecho_Widget::widget('Widget_Options')->index));
+define('ABOAUTH_CALLBACK_URL', Typecho_Common::url('/ab-oauth-callback/', Typecho_Widget::widget('Widget_Options')->index));
 
 return array(
     'THINK_SDK_QQ' => array(

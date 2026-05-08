@@ -29,6 +29,7 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         } else {
             $_SESSION['ab_oauth_referer'] = Typecho_Common::url('profile.php', $this->options->adminUrl);
         }
+        $_SESSION['ab_oauth_type'] = $type;
 
         require_once __DIR__ . '/ThinkOauth.php';
         $sdk = ABOAuthThinkOauth::getInstance($type);
@@ -47,9 +48,11 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
 
         $this->startSession();
         $this->referer = isset($_SESSION['ab_oauth_referer']) ? (string)$_SESSION['ab_oauth_referer'] : '';
+        $sessionType = isset($_SESSION['ab_oauth_type']) ? (string)$_SESSION['ab_oauth_type'] : '';
         unset($_SESSION['ab_oauth_referer']);
+        unset($_SESSION['ab_oauth_type']);
 
-        $type = strtolower(trim((string)$this->request->get('type')));
+        $type = $this->resolveCallbackType($sessionType);
         $code = trim((string)$this->request->get('code'));
         $providers = AdminBeautifyOAuth_Plugin::options('', true);
         if ($type === '' || $code === '' || !isset($providers[$type])) {
@@ -271,6 +274,24 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         return strpos($url, $this->options->index) === 0 || strpos($url, $this->options->adminUrl) === 0;
     }
 
+    private function resolveCallbackType($sessionType = '')
+    {
+        $type = strtolower(trim((string)$this->request->get('type')));
+        if ($type !== '') {
+            return $type;
+        }
+
+        $path = trim((string)$this->request->getPathInfo());
+        if ($path !== '' && preg_match('#/ab-oauth-callback/([^/?]+)#i', $path, $m)) {
+            $fromPath = strtolower(trim(rawurldecode($m[1])));
+            if ($fromPath !== '') {
+                return $fromPath;
+            }
+        }
+
+        return strtolower(trim((string)$sessionType));
+    }
+
     private function redirectLoginWithNotice($msg)
     {
         try {
@@ -326,7 +347,17 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         $sdk = ABOAuthThinkOauth::getInstance('msn', $token);
         $data = $sdk->call('me');
         if (!empty($data) && !empty($data['id'])) {
-            return array('nickname' => $data['name'], 'head_img' => '');
+            $name = '';
+            if (!empty($data['displayName'])) {
+                $name = $data['displayName'];
+            } elseif (!empty($data['name'])) {
+                $name = $data['name'];
+            } elseif (!empty($data['userPrincipalName'])) {
+                $name = $data['userPrincipalName'];
+            } elseif (!empty($data['mail'])) {
+                $name = $data['mail'];
+            }
+            return array('nickname' => $name !== '' ? $name : $data['id'], 'head_img' => '');
         }
         return array();
     }

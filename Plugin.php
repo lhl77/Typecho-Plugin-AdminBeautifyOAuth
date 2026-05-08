@@ -17,7 +17,6 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
     public static function activate()
     {
         Helper::addRoute('ab_oauth', '/ab-oauth', 'AdminBeautifyOAuth_Widget', 'oauth');
-        Helper::addRoute('ab_oauth_callback', '/ab-oauth-callback', 'AdminBeautifyOAuth_Widget', 'callback');
         Helper::addRoute('ab_oauth_callback_type', '/ab-oauth-callback/[type:string]', 'AdminBeautifyOAuth_Widget', 'callback');
         Helper::addRoute('ab_oauth_toggle', '/ab-oauth-toggle', 'AdminBeautifyOAuth_Widget', 'toggle');
         Helper::addRoute('ab_oauth_missing', '/ab-oauth-missing', 'AdminBeautifyOAuth_Widget', 'missing');
@@ -32,7 +31,6 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
     public static function deactivate()
     {
         Helper::removeRoute('ab_oauth');
-        Helper::removeRoute('ab_oauth_callback');
         Helper::removeRoute('ab_oauth_callback_type');
         Helper::removeRoute('ab_oauth_toggle');
         Helper::removeRoute('ab_oauth_missing');

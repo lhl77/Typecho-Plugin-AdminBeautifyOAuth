@@ -17,25 +17,25 @@ class MsnSDK extends ABOAuthThinkOauth
      * 获取requestCode的api接口
      * @var string
      */
-    protected $GetRequestCodeURL = 'https://login.live.com/oauth20_authorize.srf';
+    protected $GetRequestCodeURL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
 
     /**
      * 获取access_token的api接口
      * @var string
      */
-    protected $GetAccessTokenURL = 'https://login.live.com/oauth20_token.srf';
+    protected $GetAccessTokenURL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
 
     /**
      * 获取request_code的额外参数 URL查询字符串格式
      * @var srting
      */
-    protected $Authorize = 'scope=wl.basic wl.offline_access wl.signin wl.emails wl.photos';
+    protected $Authorize = 'scope=openid profile email offline_access User.Read';
 
     /**
      * API根路径
      * @var string
      */
-    protected $ApiBase = 'https://apis.live.net/v5.0/';
+    protected $ApiBase = 'https://graph.microsoft.com/v1.0/';
 
     /**
      * 组装接口调用参数 并调用接口
@@ -46,12 +46,12 @@ class MsnSDK extends ABOAuthThinkOauth
      */
     public function call($api, $param = '', $method = 'GET', $multi = false)
     {
-        /*  MSN 调用公共参数 */
-        $params = array(
-            'access_token' => $this->Token['access_token'],
+        $params = array();
+        $header = array(
+            'Authorization: Bearer ' . $this->Token['access_token']
         );
 
-        $data = $this->http($this->url($api), $this->param($params, $param), $method);
+        $data = $this->http($this->url($api), $this->param($params, $param), $method, $header);
         return json_decode($data, true);
     }
     
@@ -62,12 +62,13 @@ class MsnSDK extends ABOAuthThinkOauth
     protected function parseToken($result, $extend)
     {
         $data = json_decode($result, true);
-        if ($data['access_token'] && $data['token_type'] && $data['expires_in']) {
+        if (!empty($data['access_token']) && !empty($data['token_type'])) {
             $this->Token = $data;
             $data['openid'] = $this->openid();
             return $data;
         } else {
-            throw new Exception("获取 MSN ACCESS_TOKEN出错：未知错误");
+            $msg = is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '未知错误';
+            throw new Exception("获取 MSN ACCESS_TOKEN出错：" . $msg);
         }
     }
     
@@ -81,11 +82,12 @@ class MsnSDK extends ABOAuthThinkOauth
             return $this->Token['openid'];
         }
 
-        $data = $this->call('me');
+        $data = $this->call('me', '$select=id,displayName,userPrincipalName,mail');
         if (!empty($data['id'])) {
             return $data['id'];
         } else {
-            throw new Exception('没有获取到 MSN 用户ID！');
+            $msg = is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '没有返回可识别数据';
+            throw new Exception('没有获取到 MSN 用户ID！响应：' . $msg);
         }
     }
 }
