@@ -7,12 +7,18 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package AB-OAuth
  * @author  LHL
- * @version 1.0.1
+ * @version 1.0.2
  * @link    https://github.com/lhl77/Typecho-Plugin-AdminBeautify
  */
 class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 {
     const TABLE_NAME = 'ab_oauth_user';
+    private const RAINBOW_PROVIDER = 'rainbow';
+    private const RAINBOW_TYPE_PREFIX = 'rainbow-';
+    private const RAINBOW_TYPE_CUSTOM = 'custom';
+    private const RAINBOW_API_BASE_DEFAULT = 'https://u.cccyun.cc/';
+    private const RAINBOW_TYPE_BASES = array('qq', 'wx', 'alipay', 'sina', 'baidu', 'huawei', 'xiaomi', 'douyin', 'bilibili', 'dingtalk');
+    private const RAINBOW_TYPES = array('rainbow-qq', 'rainbow-wx', 'rainbow-alipay', 'rainbow-sina', 'rainbow-baidu', 'rainbow-huawei', 'rainbow-xiaomi', 'rainbow-douyin', 'rainbow-bilibili', 'rainbow-dingtalk');
 
     public static function activate()
     {
@@ -50,6 +56,12 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
             }
         } catch (Exception $e) {
         }
+        $providersJson = json_encode(self::normalizeProviderRows((array) json_decode($providersJson, true)), JSON_UNESCAPED_UNICODE);
+        if ($providersJson === false || $providersJson === 'null') {
+            $providersJson = self::defaultProvidersJson();
+        }
+        $providerRows = (array) json_decode($providersJson, true);
+        $hasProviderRows = !empty($providerRows);
 
         $adminReady = self::isAdminBeautifyReady();
         if (!$adminReady) {
@@ -99,13 +111,14 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
         $tips = '<div class="ab-oauth-panel">'
             . '<div class="ab-oauth-head">'
             . '<strong>AdminBeautify 专用 OAuth 第三方登录插件</strong>'
-            . '<p>支持：QQ / 微信 / GitHub / Google / MSN / 新浪 / 豆瓣 / 百度 / OIDC 等。</p>'
+            . '<p>支持：QQ / 微信 / 微博 / 百度 / GitHub / Google / MSN / 新浪 / 豆瓣 / 彩虹聚合登录 / OIDC 等。</p>'
             . '</div>'
             . '<div class="ab-oauth-guide">'
             . '<span><b>显示名称</b>：按钮与列表展示文字</span>'
-            . '<span><b>Client ID</b>：平台分配的 AppKey / Client ID</span>'
-            . '<span><b>Client Secret</b>：平台分配的 AppSecret / Client Secret</span>'
+            . '<span><b>APPID</b>：平台分配的 客户端 APPID</span>'
+            . '<span><b>APP Key</b>：平台分配的 AppKey / Client Secret</span>'
             . '</div>'
+            . (!$hasProviderRows ? '<div class="ab-oauth-route-alert" style="margin-bottom:12px"><strong>当前暂无配置，需要添加</strong><p>请点击“+ 新增平台”添加至少一条 OAuth 配置后保存。</p></div>' : '')
             . '<div class="ab-oauth-toolbar"><button type="button" id="ab-oauth-add-row" class="ab-oauth-btn">+ 新增平台</button><button type="button" id="ab-oauth-export-clip" class="ab-oauth-btn-tonal">导出到剪贴板</button><button type="button" id="ab-oauth-export-file" class="ab-oauth-btn-tonal">导出 .json</button><button type="button" id="ab-oauth-import-clip" class="ab-oauth-btn-outlined">从剪贴板导入</button><label id="ab-oauth-import-file-label" class="ab-oauth-btn-outlined">从文件导入<input type="file" id="ab-oauth-import-file" accept=".json,application/json" style="display:none"></label></div>'
             . '<div id="ab-oauth-config-editor" style="margin-top:16px !important;"></div>'
             . '<div class="ab-oauth-help">'
@@ -128,16 +141,23 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 #ab-oauth-config-editor,
 .ab-oauth-panel{--ab-md-surface:var(--md-surface,#fff);--ab-md-on:var(--md-on-surface,#1f1b24);--ab-md-on-subtle:var(--md-on-surface-variant,#6b7280);--ab-md-outline:var(--md-outline-variant,#d5d7de);--ab-md-primary:var(--md-primary,#6750a4);--ab-md-danger:#ef4444}
 #ab-oauth-config-editor{display:grid;gap:16px;margin-bottom:12px}
-.ab-oauth-row{display:grid;grid-template-columns:120px 1fr 1.1fr 1.1fr auto auto auto;gap:10px;align-items:start;padding:14px 16px;border-radius:14px;background:var(--md-surface-container,#f3edf7);border:1px solid var(--ab-md-outline)}
-.ab-oauth-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ab-oauth-row{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:18px 20px;border-radius:16px;background:var(--md-surface-container,#f3edf7);border:1px solid var(--ab-md-outline)}
+.ab-oauth-row .is-hidden{display:none !important}
+.ab-oauth-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ab-field-type{flex:0 0 135px}
+.ab-field-title{flex:0 0 120px}
+.ab-field-key,.ab-field-secret{flex:1 1 180px}
+.ab-field-rt{flex:0 0 110px}
+.ab-field-ra{flex:2 1 200px}
+.ab-oauth-actions{display:flex;align-items:center;gap:10px;flex:1 0 auto;justify-content:flex-end}
 .ab-oauth-label{font-size:11px;line-height:1;font-weight:600;color:var(--ab-md-on-subtle);user-select:none}
-.ab-oauth-row input,.ab-oauth-row select{width:100%;height:34px;padding:5px 10px;border:1px solid var(--ab-md-outline);border-radius:8px;background:var(--ab-md-surface);color:var(--ab-md-on);font-size:13px;transition:border-color 0.2s;box-sizing:border-box}
+.ab-oauth-row input,.ab-oauth-row select{width:100%;height:36px;padding:5px 10px;border:1px solid var(--ab-md-outline);border-radius:8px;background:var(--ab-md-surface);color:var(--ab-md-on);font-size:13px;transition:border-color 0.2s;box-sizing:border-box}
 .ab-oauth-row input:focus,.ab-oauth-row select:focus{border-color:var(--ab-md-primary);outline:none}
 .ab-oauth-row input::placeholder{color:color-mix(in srgb,var(--ab-md-on-subtle) 55%, transparent)}
-.ab-oauth-row .ab-oauth-del{border:none;background:var(--ab-md-danger);color:#fff;border-radius:8px;height:34px;padding:0 12px;cursor:pointer;font-weight:600;font-size:13px;margin-top:15px;white-space:nowrap}
-.ab-oauth-row .ab-oauth-copy{border:1px solid var(--ab-md-outline);background:transparent;color:var(--ab-md-on-subtle);border-radius:8px;height:34px;padding:0 10px;cursor:pointer;font-size:12px;margin-top:15px;white-space:nowrap;transition:background 0.15s,color 0.15s}
-.ab-oauth-row .ab-oauth-copy:hover{background:color-mix(in srgb,var(--ab-md-primary) 10%, transparent);color:var(--ab-md-primary);border-color:var(--ab-md-primary)}
-.ab-oauth-enabled{display:flex;align-items:center;height:34px;gap:6px;padding:0 10px;border:1px dashed var(--ab-md-outline);border-radius:8px;color:var(--ab-md-on-subtle);cursor:pointer;margin-top:15px;white-space:nowrap}
+.ab-oauth-row .ab-oauth-del{border:none;background:var(--ab-md-danger);color:#fff;border-radius:8px;height:36px;padding:0 16px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.ab-oauth-row .ab-oauth-copy{border:1px solid var(--ab-md-outline);background:transparent;color:var(--ab-md-on-subtle);border-radius:8px;height:36px;padding:0 12px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;transition:background 0.15s,color 0.15s;display:inline-flex;align-items:center;justify-content:center}
+.ab-oauth-row .ab-oauth-copy:hover{background:color-mix(in srgb,var(--ab-md-primary) 10%, transparent);color:var(--ab-md-primary);border-color:var(--ab-md-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--ab-md-primary) 15%, transparent)}
+.ab-oauth-enabled{display:flex;align-items:center;height:36px;gap:6px;padding:0 12px;border:1px dashed var(--ab-md-outline);border-radius:8px;color:var(--ab-md-on-subtle);cursor:pointer;white-space:nowrap;font-size:13px;user-select:none;font-weight:500}
 .ab-oauth-enabled input{width:15px;height:15px;accent-color:var(--ab-md-primary)}
 .ab-oauth-head p{margin:.4em 0 .8em;color:var(--ab-md-on-subtle)}
 .ab-oauth-guide{display:grid;gap:6px;padding:12px 16px;border:1px solid var(--ab-md-outline);border-radius:16px;background:color-mix(in srgb,var(--ab-md-primary) 5%, var(--ab-md-surface));margin-bottom:16px}
@@ -157,7 +177,15 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 [data-theme="dark"] .ab-oauth-panel{--ab-md-surface:var(--md-dark-surface-container,#211f26);--ab-md-on:var(--md-dark-on-surface,#e6e1e5);--ab-md-on-subtle:var(--md-dark-on-surface-variant,#cac4d0);--ab-md-outline:var(--md-dark-outline-variant,#49454f);--ab-md-primary:var(--md-dark-primary,#d0bcff)}
 [data-theme="dark"] .ab-oauth-row{background:var(--md-dark-surface-container-low,#1c1b1f)}
 [data-theme="dark"] #ab-oauth-add-row,[data-theme="dark"] .ab-oauth-btn{color:#1c1b1f;box-shadow:0 4px 10px color-mix(in srgb,var(--ab-md-primary) 15%, transparent)}
-@media (max-width: 1080px){.ab-oauth-row{grid-template-columns:1fr 1fr;gap:10px}.ab-oauth-row .ab-oauth-del,.ab-oauth-enabled,.ab-oauth-row .ab-oauth-copy{grid-column:1 / -1;margin-top:0}}
+@media (max-width: 1080px) {
+  .ab-oauth-row{gap:14px;}
+}
+@media (max-width: 820px) {
+  .ab-oauth-row{flex-direction:column;align-items:stretch;}
+  .ab-oauth-field{flex:1 1 auto;width:100%;}
+  .ab-oauth-actions{flex-wrap:wrap;justify-content:space-between;margin-top:4px}
+  .ab-oauth-actions > *{flex:1 1 auto;justify-content:center}
+}
 </style>';
 
         echo $tips;
@@ -181,9 +209,25 @@ function createInput(className, placeholder, value){
     input.value=value||"";
     return input;
 }
-function wrapField(labelText, node){
+function isRainbow(type){return String(type||"").toLowerCase()==="rainbow";}
+function rainbowTypeOptions(){
+    return [{v:"",t:"请选择"},{v:"wx",t:"微信"},{v:"qq",t:"QQ"},{v:"alipay",t:"支付宝"},{v:"sina",t:"微博"},{v:"baidu",t:"百度"},{v:"huawei",t:"华为"},{v:"xiaomi",t:"小米"},{v:"douyin",t:"抖音"},{v:"bilibili",t:"哔哩哔哩"},{v:"dingtalk",t:"钉钉"},{v:"custom",t:"自定义"}];
+}
+function createSelect(className, options, value){
+    var select=document.createElement("select");
+    select.className=className;
+    for(var i=0;i<options.length;i++){
+        var opt=document.createElement("option");
+        opt.value=options[i].v;
+        opt.textContent=options[i].t;
+        if(options[i].v===value){opt.selected=true;}
+        select.appendChild(opt);
+    }
+    return select;
+}
+function wrapField(labelText, node, extClass){
     var wrap=document.createElement("div");
-    wrap.className="ab-oauth-field";
+    wrap.className="ab-oauth-field "+(extClass||"");
     var label=document.createElement("span");
     label.className="ab-oauth-label";
     label.textContent=labelText;
@@ -206,8 +250,20 @@ function rowTemplate(item, sync){
         select.appendChild(opt);
     }
     var titleInput=createInput("ab-title","显示名称",item.title||"");
-    var keyInput=createInput("ab-key","APP_KEY / Client ID",item.appKey||"");
-    var secretInput=createInput("ab-secret","APP_SECRET / Client Secret",item.appSecret||"");
+    var keyInput=createInput("ab-key","APPID",item.appKey||"");
+    var secretInput=createInput("ab-secret","APP Key",item.appSecret||"");
+    var rainbowTypeInput=createSelect("ab-rainbow-type", rainbowTypeOptions(), (item.rainbowType||""));
+    var rainbowApiInput=createInput("ab-rainbow-api","默认 https://u.cccyun.cc/（不加connect.php）",item.rainbowApiBase||"");
+    var rainbowCustomTypeInput=createInput("ab-rainbow-custom-type","自定义 type 英文（示例：steam）",item.rainbowCustomType||"");
+    var rainbowIconInput=createInput("ab-rainbow-icon","SVG 图标地址（https://.../icon.svg）",item.rainbowIcon||"");
+    var rainbowBgInput=createInput("ab-rainbow-bg","背景色（示例：#6750a4）",item.rainbowBackground||"");
+    var rainbowTextInput=createInput("ab-rainbow-text","文字色（示例：#ffffff）",item.rainbowText||"");
+    var rainbowTypeWrap=wrapField("彩虹 type", rainbowTypeInput);
+    var rainbowApiWrap=wrapField("彩虹接口地址", rainbowApiInput);
+    var rainbowCustomTypeWrap=wrapField("自定义 type", rainbowCustomTypeInput);
+    var rainbowIconWrap=wrapField("SVG 图标地址", rainbowIconInput);
+    var rainbowBgWrap=wrapField("背景色", rainbowBgInput);
+    var rainbowTextWrap=wrapField("文字色", rainbowTextInput);
     var label=document.createElement("label");
     label.className="ab-oauth-enabled";
     var enabled=document.createElement("input");
@@ -221,10 +277,16 @@ function rowTemplate(item, sync){
     delBtn.className="ab-oauth-del";
     delBtn.textContent="删除";
 
-    row.appendChild(wrapField("登录平台", select));
+    row.appendChild(wrapField("登录方式", select));
     row.appendChild(wrapField("显示名称", titleInput));
-    row.appendChild(wrapField("Client ID", keyInput));
-    row.appendChild(wrapField("Client Secret", secretInput));
+    row.appendChild(wrapField("APPID", keyInput));
+    row.appendChild(wrapField("APP Key", secretInput));
+    row.appendChild(rainbowTypeWrap);
+    row.appendChild(rainbowCustomTypeWrap);
+    row.appendChild(rainbowIconWrap);
+    row.appendChild(rainbowBgWrap);
+    row.appendChild(rainbowTextWrap);
+    row.appendChild(rainbowApiWrap);
     row.appendChild(label);
     var copyBtn=document.createElement("button");
     copyBtn.type="button";
@@ -239,7 +301,21 @@ function rowTemplate(item, sync){
     row.appendChild(copyBtn);
     row.appendChild(delBtn);
 
+    function applyTypeUI(){
+        var rainbow=isRainbow(select.value);
+        var custom=String(rainbowTypeInput.value||"").toLowerCase()==="custom";
+        rainbowTypeWrap.className="ab-oauth-field"+(rainbow?"":" is-hidden");
+        rainbowCustomTypeWrap.className="ab-oauth-field"+(rainbow&&custom?"":" is-hidden");
+        rainbowIconWrap.className="ab-oauth-field"+(rainbow&&custom?"":" is-hidden");
+        rainbowBgWrap.className="ab-oauth-field"+(rainbow&&custom?"":" is-hidden");
+        rainbowTextWrap.className="ab-oauth-field"+(rainbow&&custom?"":" is-hidden");
+        rainbowApiWrap.className="ab-oauth-field"+(rainbow?"":" is-hidden");
+    }
+    applyTypeUI();
+
     delBtn.addEventListener("click",function(){row.remove();sync();});
+    select.addEventListener("change",function(){applyTypeUI();sync();});
+    rainbowTypeInput.addEventListener("change",function(){applyTypeUI();sync();});
     var fields=row.querySelectorAll("input,select");
     for(var j=0;j<fields.length;j++){
         fields[j].addEventListener("input",sync);
@@ -258,6 +334,12 @@ function init(textarea, root, addBtn){
                 title: cleanText(row.querySelector(".ab-title").value),
                 appKey: cleanText(row.querySelector(".ab-key").value),
                 appSecret: cleanText(row.querySelector(".ab-secret").value),
+                rainbowType: cleanText((row.querySelector(".ab-rainbow-type")||{}).value||""),
+                rainbowCustomType: cleanText((row.querySelector(".ab-rainbow-custom-type")||{}).value||""),
+                rainbowIcon: cleanText((row.querySelector(".ab-rainbow-icon")||{}).value||""),
+                rainbowBackground: cleanText((row.querySelector(".ab-rainbow-bg")||{}).value||""),
+                rainbowText: cleanText((row.querySelector(".ab-rainbow-text")||{}).value||""),
+                rainbowApiBase: cleanText((row.querySelector(".ab-rainbow-api")||{}).value||""),
                 enabled: !!row.querySelector(".ab-enabled").checked
             });
         }
@@ -265,13 +347,12 @@ function init(textarea, root, addBtn){
     }
 
   var data=safeParse(textarea.value);
-  if(!data.length){data=[{type:"github",title:"GitHub",appKey:"",appSecret:"",enabled:true}];}
     for(var i=0;i<data.length;i++){
         root.appendChild(rowTemplate(data[i]||{}, sync));
     }
   sync();
     addBtn.addEventListener("click",function(){
-        root.appendChild(rowTemplate({type:"github",title:"GitHub",appKey:"",appSecret:"",enabled:true}, sync));
+        root.appendChild(rowTemplate({type:"github",title:"GitHub",appKey:"",appSecret:"",rainbowType:"",rainbowCustomType:"",rainbowIcon:"",rainbowBackground:"",rainbowText:"",rainbowApiBase:"",enabled:true}, sync));
         sync();
     });
 }
@@ -319,7 +400,7 @@ function tryMount(retry){
         var data; try{data=JSON.parse(txt);}catch(e){alert("配置格式错误，请检查 JSON 内容。");return;}
         if(!Array.isArray(data)){alert("配置格式错误：顶层应为数组。");return;}
         root.innerHTML="";
-        var s=function(){var d=[];var rs=root.querySelectorAll(".ab-oauth-row");for(var i=0;i<rs.length;i++){var r=rs[i];d.push({type:r.querySelector(".ab-type").value,title:cleanText(r.querySelector(".ab-title").value),appKey:cleanText(r.querySelector(".ab-key").value),appSecret:cleanText(r.querySelector(".ab-secret").value),enabled:!!r.querySelector(".ab-enabled").checked});}textarea.value=JSON.stringify(d);};
+        var s=function(){var d=[];var rs=root.querySelectorAll(".ab-oauth-row");for(var i=0;i<rs.length;i++){var r=rs[i];d.push({type:r.querySelector(".ab-type").value,title:cleanText(r.querySelector(".ab-title").value),appKey:cleanText(r.querySelector(".ab-key").value),appSecret:cleanText(r.querySelector(".ab-secret").value),rainbowType:cleanText((r.querySelector(".ab-rainbow-type")||{}).value||""),rainbowCustomType:cleanText((r.querySelector(".ab-rainbow-custom-type")||{}).value||""),rainbowIcon:cleanText((r.querySelector(".ab-rainbow-icon")||{}).value||""),rainbowBackground:cleanText((r.querySelector(".ab-rainbow-bg")||{}).value||""),rainbowText:cleanText((r.querySelector(".ab-rainbow-text")||{}).value||""),rainbowApiBase:cleanText((r.querySelector(".ab-rainbow-api")||{}).value||""),enabled:!!r.querySelector(".ab-enabled").checked});}textarea.value=JSON.stringify(d);};
         for(var i=0;i<data.length;i++){root.appendChild(rowTemplate(data[i]||{},s));} s();
         alert("导入成功，请记得保存设置。");
     }
@@ -380,8 +461,9 @@ if(document.readyState==="loading"){
         $buttons = array();
         foreach ($providers as $type => $meta) {
             $styleColor = isset($sdkColors[$type]) && is_array($sdkColors[$type]) ? $sdkColors[$type] : array();
-            $background = !empty($styleColor['background']) ? (string)$styleColor['background'] : $meta['color'];
-            $text = !empty($styleColor['text']) ? (string)$styleColor['text'] : '#ffffff';
+            $background = !empty($meta['color']) ? (string)$meta['color'] : (!empty($styleColor['background']) ? (string)$styleColor['background'] : '#6750a4');
+            $text = !empty($meta['text']) ? (string)$meta['text'] : (!empty($styleColor['text']) ? (string)$styleColor['text'] : '#ffffff');
+            $icon = !empty($meta['icon']) ? (string)$meta['icon'] : ($iconsBaseUrl . '/' . self::iconFileForType($type));
             $buttons[] = array(
                 'type'       => $type,
                 'title'      => $meta['title'],
@@ -389,7 +471,7 @@ if(document.readyState==="loading"){
                 'background' => $background,
                 'text'       => $text,
                 'label'      => self::firstCharLabel($meta['title']),
-                'icon'       => $iconsBaseUrl . '/' . $type . '.svg',
+                'icon'       => $icon,
                 'href'       => Typecho_Common::url('/ab-oauth?type=' . rawurlencode($type), $options->index),
             );
         }
@@ -480,6 +562,7 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                 'type' => $type,
                 'title' => $meta['title'],
                 'color' => $iconBg,
+                'icon' => !empty($meta['icon']) ? (string)$meta['icon'] : '',
                 'configured' => $isConfigured,
                 'bound' => $isBound,
                 'nickname' => $isBound ? $bound[$type]['nickname'] : '',
@@ -516,7 +599,8 @@ function buildCard(){
             row.className="ab-oauth-profile-row"+(i.bound?" is-bound":"")+(!i.configured?" is-unconfigured":"");
             var state=i.configured?(i.bound?(i.nickname?"\u5df2\u7ed1\u5b9a\uff1a"+i.nickname:"\u5df2\u7ed1\u5b9a"):"\u672a\u7ed1\u5b9a"):"\u672a\u914d\u7f6e AppKey / Secret";
             var fl=String(i.title||"O").slice(0,1).toUpperCase();
-            row.innerHTML="<div class=\"ab-oauth-left\"><span class=\"ab-oauth-dot\" style=\"--ab-oauth-color:"+i.color+"\" data-letter=\""+fl+"\"><img class=\"ab-oauth-icon-img\" src=\""+iconsBaseUrl+"/"+i.type+".svg\" onerror=\"var p=this.parentNode;p.removeChild(this);p.textContent=p.dataset.letter\"></span><div><div class=\"ab-oauth-name\">"+i.title+"</div><div class=\"ab-oauth-state\">"+state+"</div></div></div><a class=\"ab-oauth-btn\" href=\""+i.actionUrl+"\">"+i.btnText+"</a>";
+            var iconSrc=i.icon?i.icon:(iconsBaseUrl+"/"+i.type+".svg");
+            row.innerHTML="<div class=\"ab-oauth-left\"><span class=\"ab-oauth-dot\" style=\"--ab-oauth-color:"+i.color+"\" data-letter=\""+fl+"\"><img class=\"ab-oauth-icon-img\" src=\""+iconSrc+"\" onerror=\"var p=this.parentNode;p.removeChild(this);p.textContent=p.dataset.letter\"></span><div><div class=\"ab-oauth-name\">"+i.title+"</div><div class=\"ab-oauth-state\">"+state+"</div></div></div><a class=\"ab-oauth-btn\" href=\""+i.actionUrl+"\">"+i.btnText+"</a>";
             list.appendChild(row);
         });
     }
@@ -647,7 +731,9 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
             $list = array();
         }
 
+        $list = self::normalizeProviderRows($list);
         $catalog = self::providerCatalog();
+        $sdkColors = self::sdkButtonColors();
         $res = array();
         foreach ($list as $row) {
             if (!is_array($row) || empty($row['type'])) {
@@ -660,11 +746,30 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
             if (empty($row['enabled'])) {
                 continue;
             }
+
+            if ($pType === self::RAINBOW_PROVIDER) {
+                $runtimeType = self::rainbowRuntimeTypeFromRow($row);
+                if ($runtimeType === '') {
+                    continue;
+                }
+                $pType = $runtimeType;
+            }
+
             $appKey = isset($row['appKey']) ? trim((string)$row['appKey']) : '';
             $appSecret = isset($row['appSecret']) ? trim((string)$row['appSecret']) : '';
+            $color = isset($catalog[$pType]['color']) ? $catalog[$pType]['color'] : '#6750a4';
+            if (isset($sdkColors[$pType]['background']) && $sdkColors[$pType]['background'] !== '') {
+                $color = (string)$sdkColors[$pType]['background'];
+            }
+            $customColor = isset($row['rainbowBackground']) ? self::sanitizeHexColor($row['rainbowBackground']) : '';
+            if ($customColor !== '') {
+                $color = $customColor;
+            }
+            $icon = isset($row['rainbowIcon']) ? trim((string)$row['rainbowIcon']) : '';
             $res[$pType] = array(
-                'title' => !empty($row['title']) ? trim((string)$row['title']) : $catalog[$pType]['title'],
-                'color' => $catalog[$pType]['color'],
+                'title' => !empty($row['title']) ? trim((string)$row['title']) : (isset($catalog[$pType]['title']) ? $catalog[$pType]['title'] : '彩虹聚合登录'),
+                'color' => $color,
+                'icon' => $icon,
                 'configured' => ($appKey !== '' && $appSecret !== ''),
             );
         }
@@ -710,6 +815,92 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 
         $colors = require $file;
         return is_array($colors) ? $colors : array();
+    }
+
+    public static function rainbowTypes()
+    {
+        return self::RAINBOW_TYPES;
+    }
+
+    public static function isRainbowLoginType($type)
+    {
+        return self::normalizeRainbowLoginType($type) !== '';
+    }
+
+    public static function isRainbowType($type)
+    {
+        $type = strtolower(trim((string)$type));
+        return $type === self::RAINBOW_PROVIDER || self::isRainbowLoginType($type);
+    }
+
+    public static function iconFileForType($type)
+    {
+        $type = strtolower(trim((string)$type));
+        $map = array(
+            'wechat' => 'wechat.svg',
+            'wx' => 'wx.svg',
+            'rainbow-wx' => 'rainbow-wx.svg',
+            'qq' => 'qq.svg',
+            'rainbow-qq' => 'rainbow-qq.svg',
+            'alipay' => 'alipay.svg',
+            'rainbow-alipay' => 'rainbow-alipay.svg',
+            'sina' => 'sina.svg',
+            'rainbow-sina' => 'rainbow-sina.svg',
+            'baidu' => 'baidu.svg',
+            'rainbow-baidu' => 'rainbow-baidu.svg',
+            'huawei' => 'huawei.svg',
+            'rainbow-huawei' => 'rainbow-huawei.svg',
+            'xiaomi' => 'xiaomi.svg',
+            'rainbow-xiaomi' => 'rainbow-xiaomi.svg',
+            'douyin' => 'douyin.svg',
+            'rainbow-douyin' => 'rainbow-douyin.svg',
+            'bilibili' => 'bilibili.svg',
+            'rainbow-bilibili' => 'rainbow-bilibili.svg',
+            'dingtalk' => 'dingtalk.svg',
+            'rainbow-dingtalk' => 'rainbow-dingtalk.svg',
+            'github' => 'github.svg',
+            'google' => 'google.svg',
+            'msn' => 'msn.svg',
+            'douban' => 'douban.svg',
+            'taobao' => 'taobao.svg',
+            'customlogin' => 'customlogin.svg',
+            'oidc' => 'customlogin.svg',
+            'rainbow' => 'customlogin.svg',
+        );
+
+        return isset($map[$type]) ? $map[$type] : ($type . '.svg');
+    }
+
+    public static function normalizeRainbowLoginType($type)
+    {
+        $type = strtolower(trim((string)$type));
+        if ($type === '') {
+            return '';
+        }
+
+        if (in_array($type, self::RAINBOW_TYPES, true)) {
+            return $type;
+        }
+
+        if (strpos($type, self::RAINBOW_TYPE_PREFIX) === 0) {
+            $base = substr($type, strlen(self::RAINBOW_TYPE_PREFIX));
+            if (in_array($base, self::RAINBOW_TYPE_BASES, true)) {
+                return self::RAINBOW_TYPE_PREFIX . $base;
+            }
+            $custom = self::sanitizeRainbowCustomType($base);
+            return $custom !== '' ? self::RAINBOW_TYPE_PREFIX . $custom : '';
+        }
+
+        return in_array($type, self::RAINBOW_TYPE_BASES, true) ? self::RAINBOW_TYPE_PREFIX . $type : '';
+    }
+
+    public static function rainbowApiLoginType($type)
+    {
+        $normalized = self::normalizeRainbowLoginType($type);
+        if ($normalized === '') {
+            return '';
+        }
+        return substr($normalized, strlen(self::RAINBOW_TYPE_PREFIX));
     }
 
     private static function hasCallbackTypeRoute()
@@ -760,6 +951,7 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 
         $list = json_decode($raw, true);
         if (!is_array($list)) $list = array();
+        $list = self::normalizeProviderRows($list);
 
         $catalog = self::providerCatalog();
         $res = array();
@@ -772,6 +964,44 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
             $appSecret = isset($row['appSecret']) ? trim((string)$row['appSecret']) : '';
             if ($onlyEnabled && !$enabled) continue;
             if ($appKey === '' || $appSecret === '') continue;
+
+            if ($pType === self::RAINBOW_PROVIDER) {
+                $runtimeType = self::rainbowRuntimeTypeFromRow($row);
+                if ($runtimeType === '') {
+                    continue;
+                }
+                $apiBase = self::normalizeRainbowApiBase(isset($row['rainbowApiBase']) ? (string)$row['rainbowApiBase'] : '');
+
+                $runtimeColor = $catalog[$pType]['color'];
+                $sdkColors = self::sdkButtonColors();
+                if (isset($sdkColors[$runtimeType]['background']) && $sdkColors[$runtimeType]['background'] !== '') {
+                    $runtimeColor = (string)$sdkColors[$runtimeType]['background'];
+                }
+                $runtimeText = isset($sdkColors[$runtimeType]['text']) && $sdkColors[$runtimeType]['text'] !== ''
+                    ? (string)$sdkColors[$runtimeType]['text']
+                    : '#ffffff';
+                $customBackground = isset($row['rainbowBackground']) ? self::sanitizeHexColor($row['rainbowBackground']) : '';
+                $customText = isset($row['rainbowText']) ? self::sanitizeHexColor($row['rainbowText']) : '';
+                $customIcon = isset($row['rainbowIcon']) ? trim((string)$row['rainbowIcon']) : '';
+                if ($customBackground !== '') {
+                    $runtimeColor = $customBackground;
+                }
+                if ($customText !== '') {
+                    $runtimeText = $customText;
+                }
+
+                $res[$runtimeType] = array(
+                    'id' => $appKey,
+                    'key' => $appSecret,
+                    'title' => !empty($row['title']) ? trim((string)$row['title']) : (isset($catalog[$runtimeType]['title']) ? $catalog[$runtimeType]['title'] : $catalog[$pType]['title']),
+                    'color' => $runtimeColor,
+                    'text' => $runtimeText,
+                    'icon' => $customIcon,
+                    'apiBase' => $apiBase,
+                );
+                continue;
+            }
+
             $res[$pType] = array(
                 'id' => $appKey,
                 'key' => $appSecret,
@@ -790,6 +1020,9 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
     public static function providerCatalog()
     {
         $sdkTypes = self::scanSdkTypes();
+        if (!in_array(self::RAINBOW_PROVIDER, $sdkTypes, true)) {
+            $sdkTypes[] = self::RAINBOW_PROVIDER;
+        }
         $sdkColors = self::sdkButtonColors();
         $catalog = array();
 
@@ -812,22 +1045,173 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
         return $catalog;
     }
 
-    private static function defaultProviders()
+    private static function normalizeProviderRows(array $rows)
     {
         $catalog = self::providerCatalog();
         $result = array();
 
-        foreach ($catalog as $type => $meta) {
-            $result[] = array(
+        foreach ($rows as $row) {
+            if (!is_array($row) || empty($row['type'])) {
+                continue;
+            }
+
+            $type = strtolower(trim((string)$row['type']));
+            if (self::isRainbowLoginType($type)) {
+                $row['type'] = self::RAINBOW_PROVIDER;
+                $row['title'] = !empty($row['title']) ? trim((string)$row['title']) : '彩虹聚合登录';
+                $normalizedFromType = self::normalizeRainbowLoginType($type);
+                $row['rainbowType'] = (strpos($normalizedFromType, self::RAINBOW_TYPE_PREFIX) === 0)
+                    ? substr($normalizedFromType, strlen(self::RAINBOW_TYPE_PREFIX))
+                    : '';
+                $type = self::RAINBOW_PROVIDER;
+            }
+
+            if ($type === self::RAINBOW_PROVIDER && empty($row['rainbowType'])) {
+                $legacyAppKey = isset($row['appKey']) ? trim((string)$row['appKey']) : '';
+                $legacyParsed = self::parseRainbowAppId($legacyAppKey);
+                if ($legacyParsed['loginType'] !== '') {
+                    $row['rainbowType'] = $legacyParsed['loginType'];
+                    $row['appKey'] = $legacyParsed['appid'];
+                }
+            }
+
+            if ($type === self::RAINBOW_PROVIDER) {
+                $row['rainbowCustomType'] = isset($row['rainbowCustomType']) ? self::sanitizeRainbowCustomType($row['rainbowCustomType']) : '';
+                $selectedType = isset($row['rainbowType']) ? strtolower(trim((string)$row['rainbowType'])) : '';
+                if (strpos($selectedType, self::RAINBOW_TYPE_PREFIX) === 0) {
+                    $selectedType = substr($selectedType, strlen(self::RAINBOW_TYPE_PREFIX));
+                }
+                if ($selectedType === self::RAINBOW_TYPE_CUSTOM) {
+                    $row['rainbowType'] = self::RAINBOW_TYPE_CUSTOM;
+                } elseif (in_array($selectedType, self::RAINBOW_TYPE_BASES, true)) {
+                    $row['rainbowType'] = $selectedType;
+                } else {
+                    if ($row['rainbowCustomType'] === '') {
+                        $row['rainbowCustomType'] = self::sanitizeRainbowCustomType($selectedType);
+                    }
+                    $row['rainbowType'] = $row['rainbowCustomType'] !== '' ? self::RAINBOW_TYPE_CUSTOM : '';
+                }
+                $row['rainbowIcon'] = isset($row['rainbowIcon']) ? trim((string)$row['rainbowIcon']) : '';
+                $row['rainbowBackground'] = isset($row['rainbowBackground']) ? self::sanitizeHexColor($row['rainbowBackground']) : '';
+                $row['rainbowText'] = isset($row['rainbowText']) ? self::sanitizeHexColor($row['rainbowText']) : '';
+            }
+
+            if (!isset($catalog[$type])) {
+                continue;
+            }
+
+            $result[$type] = array_merge(array(
                 'type' => $type,
-                'title' => isset($meta['title']) ? (string)$meta['title'] : strtoupper($type),
+                'title' => $catalog[$type]['title'],
                 'appKey' => '',
                 'appSecret' => '',
-                'enabled' => ($type === 'github'),
-            );
+                'rainbowType' => '',
+                'rainbowCustomType' => '',
+                'rainbowIcon' => '',
+                'rainbowBackground' => '',
+                'rainbowText' => '',
+                'rainbowApiBase' => '',
+                'enabled' => false,
+            ), $row);
+            $result[$type]['type'] = $type;
+            if ($type === self::RAINBOW_PROVIDER) {
+                $result[$type]['rainbowType'] = isset($result[$type]['rainbowType']) ? strtolower(trim((string)$result[$type]['rainbowType'])) : '';
+                if (!in_array($result[$type]['rainbowType'], self::RAINBOW_TYPE_BASES, true) && $result[$type]['rainbowType'] !== self::RAINBOW_TYPE_CUSTOM) {
+                    $result[$type]['rainbowType'] = '';
+                }
+                $result[$type]['rainbowCustomType'] = isset($result[$type]['rainbowCustomType']) ? self::sanitizeRainbowCustomType($result[$type]['rainbowCustomType']) : '';
+                $result[$type]['rainbowIcon'] = isset($result[$type]['rainbowIcon']) ? trim((string)$result[$type]['rainbowIcon']) : '';
+                $result[$type]['rainbowBackground'] = isset($result[$type]['rainbowBackground']) ? self::sanitizeHexColor($result[$type]['rainbowBackground']) : '';
+                $result[$type]['rainbowText'] = isset($result[$type]['rainbowText']) ? self::sanitizeHexColor($result[$type]['rainbowText']) : '';
+                $result[$type]['rainbowApiBase'] = isset($result[$type]['rainbowApiBase']) ? trim((string)$result[$type]['rainbowApiBase']) : '';
+            }
         }
 
-        return $result;
+        return array_values($result);
+    }
+
+    private static function parseRainbowAppId($raw)
+    {
+        $raw = trim((string)$raw);
+        if ($raw === '') {
+            return array('loginType' => '', 'appid' => '');
+        }
+
+        if (!preg_match('/^([a-z0-9_\-]+)\s*:\s*(.+)$/i', $raw, $m)) {
+            return array('loginType' => '', 'appid' => '');
+        }
+
+        $loginType = strtolower(trim((string)$m[1]));
+        if (strpos($loginType, self::RAINBOW_TYPE_PREFIX) === 0) {
+            $loginType = substr($loginType, strlen(self::RAINBOW_TYPE_PREFIX));
+        }
+        $appid = trim($m[2]);
+        if (!in_array($loginType, self::RAINBOW_TYPE_BASES, true) || $appid === '') {
+            return array('loginType' => '', 'appid' => '');
+        }
+
+        return array('loginType' => $loginType, 'appid' => $appid);
+    }
+
+    private static function sanitizeRainbowCustomType($raw)
+    {
+        $type = strtolower(trim((string)$raw));
+        if ($type === '') {
+            return '';
+        }
+        if (!preg_match('/^[a-z][a-z0-9_-]{1,31}$/', $type)) {
+            return '';
+        }
+        return $type;
+    }
+
+    private static function sanitizeHexColor($raw)
+    {
+        $color = trim((string)$raw);
+        if ($color === '') {
+            return '';
+        }
+        return preg_match('/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/', $color) ? strtolower($color) : '';
+    }
+
+    private static function rainbowRuntimeTypeFromRow(array $row)
+    {
+        $rainbowType = isset($row['rainbowType']) ? strtolower(trim((string)$row['rainbowType'])) : '';
+        if ($rainbowType === self::RAINBOW_TYPE_CUSTOM) {
+            $custom = self::sanitizeRainbowCustomType(isset($row['rainbowCustomType']) ? $row['rainbowCustomType'] : '');
+            return $custom !== '' ? self::RAINBOW_TYPE_PREFIX . $custom : '';
+        }
+
+        if ($rainbowType !== '') {
+            if (strpos($rainbowType, self::RAINBOW_TYPE_PREFIX) === 0) {
+                $rainbowType = substr($rainbowType, strlen(self::RAINBOW_TYPE_PREFIX));
+            }
+            if (in_array($rainbowType, self::RAINBOW_TYPE_BASES, true)) {
+                return self::RAINBOW_TYPE_PREFIX . $rainbowType;
+            }
+        }
+
+        return '';
+    }
+
+    private static function normalizeRainbowApiBase($raw)
+    {
+        $raw = trim((string)$raw);
+        if ($raw === '') {
+            return self::RAINBOW_API_BASE_DEFAULT;
+        }
+
+        $raw = preg_replace('#/connect\.php/?$#i', '', $raw);
+        if ($raw === null || $raw === '') {
+            return self::RAINBOW_API_BASE_DEFAULT;
+        }
+
+        return rtrim($raw, '/') . '/';
+    }
+
+    private static function defaultProviders()
+    {
+        return array();
     }
 
     private static function scanSdkTypes()
@@ -861,11 +1245,24 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
     private static function providerDisplayTitle($type)
     {
         $type = strtolower((string)$type);
-        if ($type === 'qq') {
-            return 'QQ';
-        }
-        if ($type === 'oidc' || $type === 'customlogin') {
-            return 'OIDC';
+        $map = array(
+            'qq' => 'QQ',
+            'wx' => '微信',
+            'wechat' => '微信',
+            'alipay' => '支付宝',
+            'sina' => '微博',
+            'baidu' => '百度',
+            'huawei' => '华为',
+            'xiaomi' => '小米',
+            'douyin' => '抖音',
+            'bilibili' => '哔哩哔哩',
+            'dingtalk' => '钉钉',
+            'rainbow' => '彩虹聚合登录',
+            'oidc' => 'OIDC',
+            'customlogin' => 'OIDC',
+        );
+        if (isset($map[$type])) {
+            return $map[$type];
         }
         if (strlen($type) <= 3) {
             return strtoupper($type);

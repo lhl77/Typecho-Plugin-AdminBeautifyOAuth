@@ -55,6 +55,7 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         $type = $this->resolveCallbackType($sessionType);
         $code = trim((string)$this->request->get('code'));
         $providers = AdminBeautifyOAuth_Plugin::options('', true);
+        $type = $this->resolveAvailableProviderType($type, $sessionType, $providers);
         if ($type === '' || $code === '' || !isset($providers[$type])) {
             $this->redirectLoginWithNotice('OAuth 回调参数无效。');
         }
@@ -62,6 +63,14 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         require_once __DIR__ . '/ThinkOauth.php';
 
         try {
+            if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($type)) {
+                require_once __DIR__ . '/sdk/RainbowSDK.class.php';
+                $state = trim((string)$this->request->get('state'));
+                if (!RainbowSDK::verifyCallbackState($state)) {
+                    throw new Exception('彩虹聚合登录状态校验失败，请重试');
+                }
+            }
+
             $sdk = ABOAuthThinkOauth::getInstance($type);
             $token = $sdk->getAccessToken($type, $code);
             if (!is_array($token) || empty($token['openid'])) {
@@ -143,6 +152,12 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         );
 
         if (!method_exists($this, $type)) {
+            if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($type)) {
+                if (!empty($token['nickname'])) $userInfo['nickname'] = $token['nickname'];
+                if (!empty($token['faceimg'])) $userInfo['head_img'] = $token['faceimg'];
+                elseif (!empty($token['head_img'])) $userInfo['head_img'] = $token['head_img'];
+                return $userInfo;
+            }
             return $userInfo;
         }
 
@@ -290,6 +305,38 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         }
 
         return strtolower(trim((string)$sessionType));
+    }
+
+    private function resolveAvailableProviderType($type, $sessionType, array $providers)
+    {
+        $type = strtolower(trim((string)$type));
+        $sessionType = strtolower(trim((string)$sessionType));
+
+        if ($type !== '' && isset($providers[$type])) {
+            return $type;
+        }
+
+        if (class_exists('AdminBeautifyOAuth_Plugin') && method_exists('AdminBeautifyOAuth_Plugin', 'normalizeRainbowLoginType')) {
+            $normalized = (string) AdminBeautifyOAuth_Plugin::normalizeRainbowLoginType($type);
+            if ($normalized !== '' && isset($providers[$normalized])) {
+                return $normalized;
+            }
+        }
+
+        if ($sessionType !== '' && isset($providers[$sessionType])) {
+            if ($type === '') {
+                return $sessionType;
+            }
+
+            if (class_exists('AdminBeautifyOAuth_Plugin') && method_exists('AdminBeautifyOAuth_Plugin', 'rainbowApiLoginType')) {
+                $sessionApiType = (string) AdminBeautifyOAuth_Plugin::rainbowApiLoginType($sessionType);
+                if ($sessionApiType !== '' && $sessionApiType === $type) {
+                    return $sessionType;
+                }
+            }
+        }
+
+        return $type;
     }
 
     private function redirectLoginWithNotice($msg)

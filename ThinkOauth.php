@@ -101,8 +101,14 @@ abstract class ABOAuthThinkOauth
      */
     public static function getInstance($type, $token = null)
     {
-        $name = ucfirst(strtolower($type)) . 'SDK';
-        require_once __DIR__ . "/sdk/{$name}.class.php";
+        $type = strtolower(trim((string)$type));
+        if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($type)) {
+            $name = 'RainbowSDK';
+            require_once __DIR__ . '/sdk/RainbowSDK.class.php';
+        } else {
+            $name = ucfirst($type) . 'SDK';
+            require_once __DIR__ . "/sdk/{$name}.class.php";
+        }
         if (class_exists($name)) {
             return new $name($token);
         } else {

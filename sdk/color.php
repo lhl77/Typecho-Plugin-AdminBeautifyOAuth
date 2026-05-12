@@ -11,6 +11,10 @@ return array(
         'background' => '#2F88FF',
         'text'       => '#ffffff',
     ),
+    'rainbow-qq' => array(
+        'background' => '#2F88FF',
+        'text'       => '#ffffff',
+    ),
     'wechat' => array(
         'background' => '#07C160',
         'text'       => '#ffffff',
@@ -31,12 +35,12 @@ return array(
         'background' => '#E6162D',
         'text'       => '#ffffff',
     ),
-    'douban' => array(
-        'background' => '#2AA516',
+    'rainbow-sina' => array(
+        'background' => '#E6162D',
         'text'       => '#ffffff',
     ),
-    'diandian' => array(
-        'background' => '#0B76FF',
+    'douban' => array(
+        'background' => '#2AA516',
         'text'       => '#ffffff',
     ),
     'taobao' => array(
@@ -45,6 +49,38 @@ return array(
     ),
     'baidu' => array(
         'background' => '#2932E1',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-baidu' => array(
+        'background' => '#2932E1',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-wx' => array(
+        'background' => '#07C160',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-alipay' => array(
+        'background' => '#1677FF',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-huawei' => array(
+        'background' => '#CF0A2C',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-xiaomi' => array(
+        'background' => '#FF6900',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-douyin' => array(
+        'background' => '#000000',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-bilibili' => array(
+        'background' => '#FB7299',
+        'text'       => '#ffffff',
+    ),
+    'rainbow-dingtalk' => array(
+        'background' => '#1677FF',
         'text'       => '#ffffff',
     ),
     'customlogin' => array(
