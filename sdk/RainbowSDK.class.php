@@ -9,26 +9,29 @@ class RainbowSDK
     private const SESSION_STATE_KEY = 'ab_oauth_rainbow_state';
 
     private array $token = array();
+    private string $slotKey = '';
 
-    public function __construct($token = null)
+    public function __construct($token = null, $slotKey = null)
     {
         $this->token = is_array($token) ? $token : array();
+        $this->slotKey = ($slotKey !== null && $slotKey !== '') ? strtolower(trim((string)$slotKey)) : '';
     }
 
     public function getRequestCodeURL($type)
     {
-        $type = strtolower(trim((string)$type));
-        $apiType = $this->resolveApiType($type);
+        $slotKey = $this->slotKey !== '' ? $this->slotKey : strtolower(trim((string)$type));
+        $config = AdminBeautifyOAuth_Plugin::options($slotKey);
+        $actualType = isset($config['_type']) ? (string)$config['_type'] : $slotKey;
+        $apiType = $this->resolveApiType($actualType);
         if ($apiType === '') {
-            throw new Exception('彩虹登录类型无效：' . $type);
+            throw new Exception('彩虹登录类型无效：' . $actualType);
         }
-        $config = AdminBeautifyOAuth_Plugin::options($type);
         if (empty($config['id']) || empty($config['key'])) {
             throw new Exception('请配置 ' . $type . ' 的 APPID 和 APP Key');
         }
         $apiUrl = $this->buildApiUrl(isset($config['apiBase']) ? (string)$config['apiBase'] : '');
 
-        $callback = Typecho_Common::url('/ab-oauth-callback/' . rawurlencode($type), Typecho_Widget::widget('Widget_Options')->index);
+        $callback = Typecho_Common::url('/ab-oauth-callback/' . rawurlencode($slotKey), Typecho_Widget::widget('Widget_Options')->index);
         $state = $this->createState();
         $params = array(
             'act' => 'login',
@@ -54,12 +57,13 @@ class RainbowSDK
 
     public function getAccessToken($type, $code, $extend = null)
     {
-        $type = strtolower(trim((string)$type));
-        $apiType = $this->resolveApiType($type);
+        $slotKey = $this->slotKey !== '' ? $this->slotKey : strtolower(trim((string)$type));
+        $config = AdminBeautifyOAuth_Plugin::options($slotKey);
+        $actualType = isset($config['_type']) ? (string)$config['_type'] : $slotKey;
+        $apiType = $this->resolveApiType($actualType);
         if ($apiType === '') {
-            throw new Exception('彩虹登录类型无效：' . $type);
+            throw new Exception('彩虹登录类型无效：' . $actualType);
         }
-        $config = AdminBeautifyOAuth_Plugin::options($type);
         if (empty($config['id']) || empty($config['key'])) {
             throw new Exception('请配置 ' . $type . ' 的 APPID 和 APP Key');
         }
@@ -83,7 +87,7 @@ class RainbowSDK
             throw new Exception($msg);
         }
 
-        $data['type'] = $type;
+        $data['type'] = $actualType;
         $data['openid'] = isset($data['social_uid']) ? (string)$data['social_uid'] : '';
         $data['head_img'] = isset($data['faceimg']) ? (string)$data['faceimg'] : '';
         $this->token = $data;
@@ -92,12 +96,13 @@ class RainbowSDK
 
     public function query($type, $social_uid)
     {
-        $type = strtolower(trim((string)$type));
-        $apiType = $this->resolveApiType($type);
+        $slotKey = $this->slotKey !== '' ? $this->slotKey : strtolower(trim((string)$type));
+        $config = AdminBeautifyOAuth_Plugin::options($slotKey);
+        $actualType = isset($config['_type']) ? (string)$config['_type'] : $slotKey;
+        $apiType = $this->resolveApiType($actualType);
         if ($apiType === '') {
-            throw new Exception('彩虹登录类型无效：' . $type);
+            throw new Exception('彩虹登录类型无效：' . $actualType);
         }
-        $config = AdminBeautifyOAuth_Plugin::options($type);
         if (empty($config['id']) || empty($config['key'])) {
             throw new Exception('请配置 ' . $type . ' 的 APPID 和 APP Key');
         }

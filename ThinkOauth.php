@@ -76,15 +76,18 @@ abstract class ABOAuthThinkOauth
     /**
      * 构造方法，配置应用信息
      * @param array $token
+     * @param string|null $slotKey 插槽键（包含 _N 后缀的唯一标识）
      */
-    public function __construct($token = null)
+    public function __construct($token = null, $slotKey = null)
     {
         //设置SDK类型
         $class = get_class($this);
         $this->Type = strtoupper(substr($class, 0, strlen($class)-3));
 
+        // 使用 slotKey（如果提供）查找配置，支持同平台多配置
+        $lookupKey = ($slotKey !== null && $slotKey !== '') ? $slotKey : strtolower($this->Type);
         //获取应用配置
-        $config = AdminBeautifyOAuth_Plugin::options(strtolower($this->Type));
+        $config = AdminBeautifyOAuth_Plugin::options($lookupKey);
         if (empty($config['id']) || empty($config['key'])) {
             throw new Exception('请配置您申请的APP_KEY和APP_SECRET');
         } else {
@@ -97,20 +100,31 @@ abstract class ABOAuthThinkOauth
     /**
      * 取得Oauth实例
      * @static
+     * @param string $slotKey 插槽键（可能包含 _N 后缀）
+     * @param mixed $token
+     * @param string|null $actualType 已解析的实际类型（可选，缺省从插槽键推断）
      * @return mixed 返回Oauth
      */
-    public static function getInstance($type, $token = null)
+    public static function getInstance($slotKey, $token = null, $actualType = null)
     {
-        $type = strtolower(trim((string)$type));
-        if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($type)) {
+        $slotKey = strtolower(trim((string)$slotKey));
+        // 如果未提供 actualType，通过去除 _N 后缀推断
+        if ($actualType === null || $actualType === '') {
+            $actualType = class_exists('AdminBeautifyOAuth_Plugin')
+                ? AdminBeautifyOAuth_Plugin::resolveSlotActualType($slotKey)
+                : preg_replace('/_\d+$/', '', $slotKey);
+        }
+        $actualType = strtolower(trim((string)$actualType));
+
+        if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($actualType)) {
             $name = 'RainbowSDK';
             require_once __DIR__ . '/sdk/RainbowSDK.class.php';
         } else {
-            $name = ucfirst($type) . 'SDK';
+            $name = ucfirst($actualType) . 'SDK';
             require_once __DIR__ . "/sdk/{$name}.class.php";
         }
         if (class_exists($name)) {
-            return new $name($token);
+            return new $name($token, $slotKey);
         } else {
             //类不存在
             return false;

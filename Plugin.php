@@ -7,7 +7,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package AB-OAuth
  * @author  LHL
- * @version 1.0.2
+ * @version 1.0.3
  * @link    https://github.com/lhl77/Typecho-Plugin-AdminBeautify
  */
 class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
@@ -141,7 +141,7 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 #ab-oauth-config-editor,
 .ab-oauth-panel{--ab-md-surface:var(--md-surface,#fff);--ab-md-on:var(--md-on-surface,#1f1b24);--ab-md-on-subtle:var(--md-on-surface-variant,#6b7280);--ab-md-outline:var(--md-outline-variant,#d5d7de);--ab-md-primary:var(--md-primary,#6750a4);--ab-md-danger:#ef4444}
 #ab-oauth-config-editor{display:grid;gap:16px;margin-bottom:12px}
-.ab-oauth-row{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:18px 20px;border-radius:16px;background:var(--md-surface-container,#f3edf7);border:1px solid var(--ab-md-outline)}
+.ab-oauth-row{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:18px 20px;padding-left:36px;border-radius:16px;background:var(--md-surface-container,#f3edf7);border:1px solid var(--ab-md-outline);position:relative}
 .ab-oauth-row .is-hidden{display:none !important}
 .ab-oauth-field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .ab-field-type{flex:0 0 135px}
@@ -154,7 +154,16 @@ class AdminBeautifyOAuth_Plugin implements Typecho_Plugin_Interface
 .ab-oauth-row input,.ab-oauth-row select{width:100%;height:36px;padding:5px 10px;border:1px solid var(--ab-md-outline);border-radius:8px;background:var(--ab-md-surface);color:var(--ab-md-on);font-size:13px;transition:border-color 0.2s;box-sizing:border-box}
 .ab-oauth-row input:focus,.ab-oauth-row select:focus{border-color:var(--ab-md-primary);outline:none}
 .ab-oauth-row input::placeholder{color:color-mix(in srgb,var(--ab-md-on-subtle) 55%, transparent)}
-.ab-oauth-row .ab-oauth-del{border:none;background:var(--ab-md-danger);color:#fff;border-radius:8px;height:36px;padding:0 16px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.ab-oauth-row .ab-oauth-del{border:none;background:color-mix(in srgb,var(--ab-md-danger) 15%, transparent);color:var(--ab-md-danger);border-radius:8px;height:36px;padding:0 16px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s}
+.ab-oauth-row .ab-oauth-del:hover{background:var(--ab-md-danger);color:#fff}
+.ab-oauth-drag-handle{display:flex;align-items:center;justify-content:center;width:32px;height:36px;cursor:grab;color:var(--ab-md-on-subtle);font-size:18px;flex-shrink:0;user-select:none;opacity:.4;transition:opacity .15s;position:absolute;left:2px;top:50%;transform:translateY(-50%)}
+.ab-oauth-drag-handle:hover{opacity:.8}
+.ab-oauth-row.is-dragging{opacity:.4;border-style:dashed}
+.ab-oauth-copy{border:none;background:color-mix(in srgb,var(--ab-md-primary) 15%, transparent);color:var(--ab-md-primary);border-radius:8px;height:36px;padding:0 16px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s}
+.ab-oauth-copy:hover{background:color-mix(in srgb,var(--ab-md-primary) 25%, transparent)}
+.ab-oauth-actions .ab-oauth-label {display:flex;align-items:center;cursor:pointer;margin-right:auto}
+.ab-oauth-row.drag-over-top{border-top:3px solid var(--ab-md-primary)}
+.ab-oauth-row.drag-over-bottom{border-bottom:3px solid var(--ab-md-primary)}
 .ab-oauth-row .ab-oauth-copy{border:1px solid var(--ab-md-outline);background:transparent;color:var(--ab-md-on-subtle);border-radius:8px;height:36px;padding:0 12px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;transition:background 0.15s,color 0.15s;display:inline-flex;align-items:center;justify-content:center}
 .ab-oauth-row .ab-oauth-copy:hover{background:color-mix(in srgb,var(--ab-md-primary) 10%, transparent);color:var(--ab-md-primary);border-color:var(--ab-md-primary);box-shadow:0 2px 6px color-mix(in srgb,var(--ab-md-primary) 15%, transparent)}
 .ab-oauth-enabled{display:flex;align-items:center;height:36px;gap:6px;padding:0 12px;border:1px dashed var(--ab-md-outline);border-radius:8px;color:var(--ab-md-on-subtle);cursor:pointer;white-space:nowrap;font-size:13px;user-select:none;font-weight:500}
@@ -238,6 +247,52 @@ function wrapField(labelText, node, extClass){
 function rowTemplate(item, sync){
   var row=document.createElement("div");
   row.className="ab-oauth-row";
+    var dragHandle=document.createElement("span");
+    dragHandle.className="ab-oauth-drag-handle";
+    dragHandle.title="拖拽排序";
+    dragHandle.innerHTML="⣿"; // md dots
+    dragHandle.draggable=true;
+    // Drag-and-drop events
+    dragHandle.addEventListener("dragstart",function(e){
+        e.dataTransfer.effectAllowed="move";
+        e.dataTransfer.setData("text/plain","");
+        setTimeout(function(){row.classList.add("is-dragging");},0);
+        row.closest("#ab-oauth-config-editor").__dragSrc=row;
+    });
+    dragHandle.addEventListener("dragend",function(){
+        row.classList.remove("is-dragging");
+        var editor=row.closest("#ab-oauth-config-editor");
+        if(editor){Array.from(editor.querySelectorAll(".ab-oauth-row")).forEach(function(r){r.classList.remove("drag-over-top","drag-over-bottom");});}
+        if(editor) editor.__dragSrc=null;
+    });
+    row.addEventListener("dragover",function(e){
+        e.preventDefault();
+        e.dataTransfer.dropEffect="move";
+        var editor=row.closest("#ab-oauth-config-editor");
+        if(!editor||editor.__dragSrc===row) return;
+        var rect=row.getBoundingClientRect();
+        var midY=rect.top+rect.height/2;
+        Array.from(editor.querySelectorAll(".ab-oauth-row")).forEach(function(r){r.classList.remove("drag-over-top","drag-over-bottom");});
+        row.classList.add(e.clientY<midY?"drag-over-top":"drag-over-bottom");
+    });
+    row.addEventListener("dragleave",function(){
+        row.classList.remove("drag-over-top","drag-over-bottom");
+    });
+    row.addEventListener("drop",function(e){
+        e.preventDefault();
+        row.classList.remove("drag-over-top","drag-over-bottom");
+        var editor=row.closest("#ab-oauth-config-editor");
+        if(!editor) return;
+        var src=editor.__dragSrc;
+        if(!src||src===row) return;
+        var rect=row.getBoundingClientRect();
+        if(e.clientY<rect.top+rect.height/2){
+            editor.insertBefore(src,row);
+        } else {
+            editor.insertBefore(src,row.nextSibling);
+        }
+        sync();
+    });
     var select=document.createElement("select");
     select.className="ab-type";
     var keys=Object.keys(catalog);
@@ -277,6 +332,7 @@ function rowTemplate(item, sync){
     delBtn.className="ab-oauth-del";
     delBtn.textContent="删除";
 
+    row.appendChild(dragHandle);
     row.appendChild(wrapField("登录方式", select));
     row.appendChild(wrapField("显示名称", titleInput));
     row.appendChild(wrapField("APPID", keyInput));
@@ -287,7 +343,11 @@ function rowTemplate(item, sync){
     row.appendChild(rainbowBgWrap);
     row.appendChild(rainbowTextWrap);
     row.appendChild(rainbowApiWrap);
-    row.appendChild(label);
+    
+    var actWrap=document.createElement("div");
+    actWrap.className="ab-oauth-actions";
+    actWrap.appendChild(label);
+    
     var copyBtn=document.createElement("button");
     copyBtn.type="button";
     copyBtn.className="ab-oauth-copy";
@@ -298,8 +358,10 @@ function rowTemplate(item, sync){
         if(navigator.clipboard){navigator.clipboard.writeText(cbUrl).then(function(){copyBtn.textContent="已复制 ✓";setTimeout(function(){copyBtn.textContent="复制回调地址";},1800);}).catch(function(){fallbackCopy(cbUrl);});}
         else{fallbackCopy(cbUrl);}
     });
-    row.appendChild(copyBtn);
-    row.appendChild(delBtn);
+    actWrap.appendChild(copyBtn);
+    actWrap.appendChild(delBtn);
+    
+    row.appendChild(actWrap);
 
     function applyTypeUI(){
         var rainbow=isRainbow(select.value);
@@ -459,20 +521,21 @@ if(document.readyState==="loading"){
         } catch (Exception $e) {}
 
         $buttons = array();
-        foreach ($providers as $type => $meta) {
-            $styleColor = isset($sdkColors[$type]) && is_array($sdkColors[$type]) ? $sdkColors[$type] : array();
+        foreach ($providers as $slotKey => $meta) {
+            $actualType = isset($meta['_type']) ? (string)$meta['_type'] : $slotKey;
+            $styleColor = isset($sdkColors[$actualType]) && is_array($sdkColors[$actualType]) ? $sdkColors[$actualType] : array();
             $background = !empty($meta['color']) ? (string)$meta['color'] : (!empty($styleColor['background']) ? (string)$styleColor['background'] : '#6750a4');
             $text = !empty($meta['text']) ? (string)$meta['text'] : (!empty($styleColor['text']) ? (string)$styleColor['text'] : '#ffffff');
-            $icon = !empty($meta['icon']) ? (string)$meta['icon'] : ($iconsBaseUrl . '/' . self::iconFileForType($type));
+            $icon = !empty($meta['icon']) ? (string)$meta['icon'] : ($iconsBaseUrl . '/' . self::iconFileForType($actualType));
             $buttons[] = array(
-                'type'       => $type,
+                'type'       => $slotKey,
                 'title'      => $meta['title'],
                 'color'      => $meta['color'],
                 'background' => $background,
                 'text'       => $text,
                 'label'      => self::firstCharLabel($meta['title']),
                 'icon'       => $icon,
-                'href'       => Typecho_Common::url('/ab-oauth?type=' . rawurlencode($type), $options->index),
+                'href'       => Typecho_Common::url('/ab-oauth?type=' . rawurlencode($slotKey), $options->index),
             );
         }
 
@@ -549,23 +612,25 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
         $settingsUrl = Typecho_Common::url('options-plugin.php?config=AdminBeautifyOAuth', $options->adminUrl);
         $sdkColors = self::sdkButtonColors();
         $items = array();
-        foreach ($providers as $type => $meta) {
-            $isBound = isset($bound[$type]);
+        foreach ($providers as $slotKey => $meta) {
+            $actualType = isset($meta['_type']) ? (string)$meta['_type'] : $slotKey;
+            $isBound = isset($bound[$actualType]);
             $isConfigured = !empty($meta['configured']);
             $actionUrl = $isConfigured
-                ? Typecho_Common::url('/ab-oauth-toggle?action=' . ($isBound ? 'unbind' : 'bind') . '&type=' . rawurlencode($type), $options->index)
+                ? Typecho_Common::url('/ab-oauth-toggle?action=' . ($isBound ? 'unbind' : 'bind') . '&type=' . rawurlencode($slotKey), $options->index)
                 : $settingsUrl;
-            $iconBg = (isset($sdkColors[$type]['background']) && $sdkColors[$type]['background'] !== '')
-                ? (string)$sdkColors[$type]['background']
+            $iconBg = (isset($sdkColors[$actualType]['background']) && $sdkColors[$actualType]['background'] !== '')
+                ? (string)$sdkColors[$actualType]['background']
                 : $meta['color'];
             $items[] = array(
-                'type' => $type,
+                'type' => $actualType,
+                'slotKey' => $slotKey,
                 'title' => $meta['title'],
                 'color' => $iconBg,
                 'icon' => !empty($meta['icon']) ? (string)$meta['icon'] : '',
                 'configured' => $isConfigured,
                 'bound' => $isBound,
-                'nickname' => $isBound ? $bound[$type]['nickname'] : '',
+                'nickname' => $isBound ? $bound[$actualType]['nickname'] : '',
                 'actionUrl' => $actionUrl,
                 'btnText' => $isConfigured ? ($isBound ? '移除' : '绑定') : '去配置',
             );
@@ -735,6 +800,7 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
         $catalog = self::providerCatalog();
         $sdkColors = self::sdkButtonColors();
         $res = array();
+        $typeCount = array();
         foreach ($list as $row) {
             if (!is_array($row) || empty($row['type'])) {
                 continue;
@@ -766,7 +832,13 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                 $color = $customColor;
             }
             $icon = isset($row['rainbowIcon']) ? trim((string)$row['rainbowIcon']) : '';
-            $res[$pType] = array(
+
+            if (!isset($typeCount[$pType])) $typeCount[$pType] = 0;
+            $typeCount[$pType]++;
+            $slotKey = $typeCount[$pType] === 1 ? $pType : $pType . '_' . $typeCount[$pType];
+
+            $res[$slotKey] = array(
+                '_type' => $pType,
                 'title' => !empty($row['title']) ? trim((string)$row['title']) : (isset($catalog[$pType]['title']) ? $catalog[$pType]['title'] : '彩虹聚合登录'),
                 'color' => $color,
                 'icon' => $icon,
@@ -820,6 +892,12 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
     public static function rainbowTypes()
     {
         return self::RAINBOW_TYPES;
+    }
+
+    public static function resolveSlotActualType($slotKey)
+    {
+        // Strip _N suffix: 'github_2' → 'github', 'rainbow-wx_3' → 'rainbow-wx'
+        return preg_replace('/_\d+$/', '', strtolower(trim((string)$slotKey)));
     }
 
     public static function isRainbowLoginType($type)
@@ -955,6 +1033,7 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 
         $catalog = self::providerCatalog();
         $res = array();
+        $typeCount = array();
         foreach ($list as $row) {
             if (!is_array($row) || empty($row['type'])) continue;
             $pType = strtolower(trim($row['type']));
@@ -990,7 +1069,12 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                     $runtimeText = $customText;
                 }
 
-                $res[$runtimeType] = array(
+                if (!isset($typeCount[$runtimeType])) $typeCount[$runtimeType] = 0;
+                $typeCount[$runtimeType]++;
+                $slotKey = $typeCount[$runtimeType] === 1 ? $runtimeType : $runtimeType . '_' . $typeCount[$runtimeType];
+
+                $res[$slotKey] = array(
+                    '_type' => $runtimeType,
                     'id' => $appKey,
                     'key' => $appSecret,
                     'title' => !empty($row['title']) ? trim((string)$row['title']) : (isset($catalog[$runtimeType]['title']) ? $catalog[$runtimeType]['title'] : $catalog[$pType]['title']),
@@ -1002,7 +1086,12 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                 continue;
             }
 
-            $res[$pType] = array(
+            if (!isset($typeCount[$pType])) $typeCount[$pType] = 0;
+            $typeCount[$pType]++;
+            $slotKey = $typeCount[$pType] === 1 ? $pType : $pType . '_' . $typeCount[$pType];
+
+            $res[$slotKey] = array(
+                '_type' => $pType,
                 'id' => $appKey,
                 'key' => $appSecret,
                 'title' => !empty($row['title']) ? trim((string)$row['title']) : $catalog[$pType]['title'],
@@ -1012,7 +1101,14 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
 
         if ($type !== '') {
             $type = strtolower($type);
-            return isset($res[$type]) ? $res[$type] : array();
+            if (isset($res[$type])) return $res[$type];
+            // Fallback: search by actual type (for SDK compat when slot key is not passed)
+            foreach ($res as $slotConfig) {
+                if (isset($slotConfig['_type']) && $slotConfig['_type'] === $type) {
+                    return $slotConfig;
+                }
+            }
+            return array();
         }
         return $res;
     }
@@ -1100,7 +1196,7 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                 continue;
             }
 
-            $result[$type] = array_merge(array(
+            $normalized = array_merge(array(
                 'type' => $type,
                 'title' => $catalog[$type]['title'],
                 'appKey' => '',
@@ -1113,21 +1209,22 @@ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded"
                 'rainbowApiBase' => '',
                 'enabled' => false,
             ), $row);
-            $result[$type]['type'] = $type;
+            $normalized['type'] = $type;
             if ($type === self::RAINBOW_PROVIDER) {
-                $result[$type]['rainbowType'] = isset($result[$type]['rainbowType']) ? strtolower(trim((string)$result[$type]['rainbowType'])) : '';
-                if (!in_array($result[$type]['rainbowType'], self::RAINBOW_TYPE_BASES, true) && $result[$type]['rainbowType'] !== self::RAINBOW_TYPE_CUSTOM) {
-                    $result[$type]['rainbowType'] = '';
+                $normalized['rainbowType'] = isset($normalized['rainbowType']) ? strtolower(trim((string)$normalized['rainbowType'])) : '';
+                if (!in_array($normalized['rainbowType'], self::RAINBOW_TYPE_BASES, true) && $normalized['rainbowType'] !== self::RAINBOW_TYPE_CUSTOM) {
+                    $normalized['rainbowType'] = '';
                 }
-                $result[$type]['rainbowCustomType'] = isset($result[$type]['rainbowCustomType']) ? self::sanitizeRainbowCustomType($result[$type]['rainbowCustomType']) : '';
-                $result[$type]['rainbowIcon'] = isset($result[$type]['rainbowIcon']) ? trim((string)$result[$type]['rainbowIcon']) : '';
-                $result[$type]['rainbowBackground'] = isset($result[$type]['rainbowBackground']) ? self::sanitizeHexColor($result[$type]['rainbowBackground']) : '';
-                $result[$type]['rainbowText'] = isset($result[$type]['rainbowText']) ? self::sanitizeHexColor($result[$type]['rainbowText']) : '';
-                $result[$type]['rainbowApiBase'] = isset($result[$type]['rainbowApiBase']) ? trim((string)$result[$type]['rainbowApiBase']) : '';
+                $normalized['rainbowCustomType'] = isset($normalized['rainbowCustomType']) ? self::sanitizeRainbowCustomType($normalized['rainbowCustomType']) : '';
+                $normalized['rainbowIcon'] = isset($normalized['rainbowIcon']) ? trim((string)$normalized['rainbowIcon']) : '';
+                $normalized['rainbowBackground'] = isset($normalized['rainbowBackground']) ? self::sanitizeHexColor($normalized['rainbowBackground']) : '';
+                $normalized['rainbowText'] = isset($normalized['rainbowText']) ? self::sanitizeHexColor($normalized['rainbowText']) : '';
+                $normalized['rainbowApiBase'] = isset($normalized['rainbowApiBase']) ? trim((string)$normalized['rainbowApiBase']) : '';
             }
+            $result[] = $normalized;
         }
 
-        return array_values($result);
+        return $result;
     }
 
     private static function parseRainbowAppId($raw)

@@ -13,11 +13,12 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
             $this->redirectLoginWithNotice('未检测到 AdminBeautify，OAuth 代理已禁用。');
         }
 
-        $type = strtolower(trim((string)$this->request->get('type')));
+        $slotKey = strtolower(trim((string)$this->request->get('type')));
         $providers = AdminBeautifyOAuth_Plugin::options('', true);
-        if ($type === '' || !isset($providers[$type])) {
+        if ($slotKey === '' || !isset($providers[$slotKey])) {
             $this->redirectLoginWithNotice('未启用该 OAuth 平台。');
         }
+        $actualType = isset($providers[$slotKey]['_type']) ? (string)$providers[$slotKey]['_type'] : $slotKey;
 
         $this->startSession();
         $redirect = trim((string)$this->request->get('redirect'));
@@ -29,15 +30,15 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         } else {
             $_SESSION['ab_oauth_referer'] = Typecho_Common::url('profile.php', $this->options->adminUrl);
         }
-        $_SESSION['ab_oauth_type'] = $type;
+        $_SESSION['ab_oauth_type'] = $slotKey;
 
         require_once __DIR__ . '/ThinkOauth.php';
-        $sdk = ABOAuthThinkOauth::getInstance($type);
+        $sdk = ABOAuthThinkOauth::getInstance($slotKey, null, $actualType);
         if (!$sdk) {
             $this->redirectLoginWithNotice('OAuth SDK 不支持该平台。');
         }
 
-        $this->response->redirect($sdk->getRequestCodeURL($type));
+        $this->response->redirect($sdk->getRequestCodeURL($slotKey));
     }
 
     public function callback()
@@ -52,18 +53,19 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
         unset($_SESSION['ab_oauth_referer']);
         unset($_SESSION['ab_oauth_type']);
 
-        $type = $this->resolveCallbackType($sessionType);
+        $slotKey = $this->resolveCallbackType($sessionType);
         $code = trim((string)$this->request->get('code'));
         $providers = AdminBeautifyOAuth_Plugin::options('', true);
-        $type = $this->resolveAvailableProviderType($type, $sessionType, $providers);
-        if ($type === '' || $code === '' || !isset($providers[$type])) {
+        $slotKey = $this->resolveAvailableProviderType($slotKey, $sessionType, $providers);
+        if ($slotKey === '' || $code === '' || !isset($providers[$slotKey])) {
             $this->redirectLoginWithNotice('OAuth 回调参数无效。');
         }
+        $actualType = isset($providers[$slotKey]['_type']) ? (string)$providers[$slotKey]['_type'] : $slotKey;
 
         require_once __DIR__ . '/ThinkOauth.php';
 
         try {
-            if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($type)) {
+            if (class_exists('AdminBeautifyOAuth_Plugin') && AdminBeautifyOAuth_Plugin::isRainbowType($actualType)) {
                 require_once __DIR__ . '/sdk/RainbowSDK.class.php';
                 $state = trim((string)$this->request->get('state'));
                 if (!RainbowSDK::verifyCallbackState($state)) {
@@ -71,15 +73,15 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
                 }
             }
 
-            $sdk = ABOAuthThinkOauth::getInstance($type);
-            $token = $sdk->getAccessToken($type, $code);
+            $sdk = ABOAuthThinkOauth::getInstance($slotKey, null, $actualType);
+            $token = $sdk->getAccessToken($slotKey, $code);
             if (!is_array($token) || empty($token['openid'])) {
                 throw new Exception('未获取到 openid');
             }
 
-            $userInfo = $this->fetchUserInfo($type, $token);
+            $userInfo = $this->fetchUserInfo($actualType, $token);
             $oauthUser = array(
-                'type' => substr($type, 0, 32),
+                'type' => substr($actualType, 0, 32),
                 'openid' => substr((string)$token['openid'], 0, 100),
                 'nickname' => substr((string)(isset($userInfo['nickname']) ? $userInfo['nickname'] : $token['openid']), 0, 100),
                 'avatar' => substr((string)(isset($userInfo['head_img']) ? $userInfo['head_img'] : ''), 0, 255),
@@ -90,7 +92,7 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
 
             if ($this->user->hasLogin()) {
                 $this->bindUser((int)$this->user->uid, $oauthUser);
-                $this->response->redirect(Typecho_Common::url('profile.php?abOAuth=bound&type=' . rawurlencode($type), $this->options->adminUrl));
+                $this->response->redirect(Typecho_Common::url('profile.php?abOAuth=bound&type=' . rawurlencode($actualType), $this->options->adminUrl));
             }
 
             $bound = $this->findBound($oauthUser['type'], $oauthUser['openid']);
@@ -100,7 +102,7 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
                 $this->response->redirect($target);
             }
 
-            $this->response->redirect(Typecho_Common::url('/ab-oauth-missing?type=' . rawurlencode($type), $this->options->index));
+            $this->response->redirect(Typecho_Common::url('/ab-oauth-missing?type=' . rawurlencode($actualType), $this->options->index));
         } catch (Exception $e) {
             $this->redirectLoginWithNotice('OAuth 登录失败：' . $e->getMessage());
         }
@@ -116,24 +118,25 @@ class AdminBeautifyOAuth_Widget extends Widget_Abstract_Users
             $this->redirectLoginWithNotice('请先登录。');
         }
 
-        $type = strtolower(trim((string)$this->request->get('type')));
+        $slotKey = strtolower(trim((string)$this->request->get('type')));
         $action = strtolower(trim((string)$this->request->get('action')));
         $providers = AdminBeautifyOAuth_Plugin::options('', true);
-        if ($type === '' || !isset($providers[$type])) {
+        if ($slotKey === '' || !isset($providers[$slotKey])) {
             $this->response->redirect(Typecho_Common::url('profile.php', $this->options->adminUrl));
         }
+        $actualType = isset($providers[$slotKey]['_type']) ? (string)$providers[$slotKey]['_type'] : $slotKey;
 
         if ($action === 'unbind') {
             $this->db->query(
                 $this->db->delete('table.' . AdminBeautifyOAuth_Plugin::TABLE_NAME)
                     ->where('uid = ?', (int)$this->user->uid)
-                    ->where('type = ?', $type)
+                    ->where('type = ?', $actualType)
             );
-            $this->response->redirect(Typecho_Common::url('profile.php?abOAuth=unbound&type=' . rawurlencode($type), $this->options->adminUrl));
+            $this->response->redirect(Typecho_Common::url('profile.php?abOAuth=unbound&type=' . rawurlencode($actualType), $this->options->adminUrl));
         }
 
         if ($action === 'bind') {
-            $this->response->redirect(Typecho_Common::url('/ab-oauth?type=' . rawurlencode($type) . '&redirect=' . rawurlencode(Typecho_Common::url('profile.php', $this->options->adminUrl)), $this->options->index));
+            $this->response->redirect(Typecho_Common::url('/ab-oauth?type=' . rawurlencode($slotKey) . '&redirect=' . rawurlencode(Typecho_Common::url('profile.php', $this->options->adminUrl)), $this->options->index));
         }
 
         $this->response->redirect(Typecho_Common::url('profile.php', $this->options->adminUrl));
