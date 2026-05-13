@@ -104,9 +104,10 @@ sdk/color.php
 - AdminBeautify: https://github.com/lhl77/Typecho-Plugin-AdminBeautify
 - AdminBeautifyOAuth: https://github.com/lhl77/Typecho-Plugin-AdminBeautifyOAuth
 
+参考项目:  [tianlingzi/TypechoOAuthLogin](https://github.com/tianlingzi/TypechoOAuthLogin)
+
 ---
 
 <p align="center">
   Made by <a href="https://github.com/lhl77">LHL</a>
 </p>
-
